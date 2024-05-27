@@ -6,8 +6,8 @@ import config
 def criar_conexao():
     try:
         conexao = config.create_connection()
-        mensagem_conexao = "Conexão com MySQL estabelecida"
-        cor_mensagem = "green"
+        mensagem_conexao = "MySQL OK"
+        cor_mensagem = "White"
     except Exception as e:
         conexao = None
         mensagem_conexao = f"Erro ao conectar ao MySQL: {e}"
@@ -22,6 +22,14 @@ def obter_anos(conexao):
         anos = cursor.fetchall()
     return anos
 
+def obter_anos_por_pais(conexao, pais):
+    anos = []
+    if conexao and conexao.is_connected():
+        cursor = conexao.cursor()
+        cursor.execute("SELECT DISTINCT ano FROM natalidade_pais WHERE pais = %s", (pais,))
+        anos = cursor.fetchall()
+    return anos
+
 def obter_paises(conexao):
     paises = []
     if conexao and conexao.is_connected():
@@ -30,39 +38,72 @@ def obter_paises(conexao):
         paises = cursor.fetchall()
     return paises
 
+def obter_taxa_natalidade_adolescente(conexao, pais, ano):
+    taxa = None
+    if conexao and conexao.is_connected():
+        cursor = conexao.cursor()
+        cursor.execute("SELECT TaxaNatalidadeAdolescente FROM natalidade_pais WHERE pais = %s AND ano = %s", (pais, ano))
+        resultado = cursor.fetchall()  # Use fetchall() para ler todos os resultados
+        if resultado:
+            taxa = resultado[0][0]  # Supondo que TaxaNatalidadeAdolescente seja a primeira coluna
+    return taxa
+
+def atualizar_anos(event, conexao, valor_saida):
+    pais_selecionado = menu_opcoes_paises.get()
+    anos = obter_anos_por_pais(conexao, pais_selecionado)
+    menu_opcoes_anos['values'] = [ano[0] for ano in anos]
+    menu_opcoes_anos.set('')  # Limpar a seleção atual
+    valor_saida.set('')  # Limpar o campo de saída
+
+def atualizar_taxa_natalidade_adolescente(event, conexao, valor_saida):
+    pais_selecionado = menu_opcoes_paises.get()
+    ano_selecionado = menu_opcoes_anos.get()
+    taxa = obter_taxa_natalidade_adolescente(conexao, pais_selecionado, ano_selecionado)
+    valor_saida.set(taxa)
+
 def criar_janela():
     raiz = tk.Tk()
-    raiz.title("Meu Dashboard")
-    raiz.state('zoomed')
+    raiz.title("Análise Big Data A3")
+    raiz.configure(bg="white")
+    raiz.geometry("1000x600")
+    raiz.minsize(1000, 600)
+    raiz.maxsize(1000, 600)
+    raiz.resizable(False, False)
 
     largura_janela = raiz.winfo_screenwidth()
     altura_janela = raiz.winfo_screenheight()
-    posicao_topo = int(altura_janela / 2 - altura_janela / 2)
-    posicao_direita = int(largura_janela / 2 - largura_janela / 2)
-    raiz.geometry(f"{largura_janela}x{altura_janela}+{posicao_direita}+{posicao_topo}")
+    largura_janela_raiz = 1000
+    altura_janela_raiz = 600
+    posicao_topo = (altura_janela - altura_janela_raiz) // 2 - 30 # Ajuste de 30 pixels para considerar a barra de tarefas
+    posicao_direita = (largura_janela - largura_janela_raiz) // 2
+    raiz.geometry(f"{largura_janela_raiz}x{altura_janela_raiz}+{posicao_direita}+{posicao_topo}")
 
-    return raiz, largura_janela, altura_janela
+    return raiz
 
-def criar_canvas(raiz, largura_janela, altura_janela):
-    canvas = tk.Canvas(raiz, width=largura_janela, height=altura_janela)
+def criar_canvas(raiz):
+    canvas = tk.Canvas(raiz, width=1000, height=600, bg="white")
     canvas.pack(fill="both", expand=True)
 
     imagem = Image.open(r"imgs/foto1.png")
-    imagem = imagem.resize((largura_janela, altura_janela))
+    imagem = imagem.resize((1000, 600))
     canvas.imagem_de_fundo = ImageTk.PhotoImage(imagem)
     canvas.create_image(0, 0, image=canvas.imagem_de_fundo, anchor="nw")
 
     return canvas
 
-def criar_menu_opcoes_anos(raiz, anos):
-    anos.sort(key=lambda x: x[0])
-
+def criar_menu_opcoes_anos(raiz):
     ano_selecionado = tk.StringVar(raiz)
-    ano_selecionado.set(anos[0][0])
+    ano_selecionado.set('')
 
-    menu_opcoes = ttk.Combobox(raiz, textvariable=ano_selecionado, values=[ano[0] for ano in anos])
+    menu_opcoes = ttk.Combobox(raiz, textvariable=ano_selecionado)
     menu_opcoes.state(["readonly"])
     return menu_opcoes, ano_selecionado
+
+def criar_campo_saida(raiz):
+    valor_saida = tk.StringVar(raiz)
+    campo_saida = tk.Label(raiz, textvariable=valor_saida, bg="white", fg="black", font=("Helvetica", 10, "bold"))
+    campo_saida.config(width=10)  # Definir uma largura fixa
+    return campo_saida, valor_saida
 
 def criar_menu_opcoes_paises(raiz, paises):
     paises.sort(key=lambda x: x[0])
@@ -70,37 +111,53 @@ def criar_menu_opcoes_paises(raiz, paises):
     pais_selecionado = tk.StringVar(raiz)
     pais_selecionado.set(paises[0][0])
 
-    menu_opcoes = ttk.Combobox(raiz, textvariable=pais_selecionado, values=[pais[0] for pais in paises])
+    estilo = ttk.Style()
+    estilo.configure('TCombobox', font=("Helvetica", 10, "bold"), background="white", foreground="black")
+
+    menu_opcoes = ttk.Combobox(raiz, textvariable=pais_selecionado, values=[pais[0] for pais in paises], style='TCombobox')
     menu_opcoes.state(["readonly"])
+
     return menu_opcoes, pais_selecionado
 
-def criar_botao_fechar(raiz, conexao, canvas, largura_janela, altura_janela):
+
+
+def criar_botao_fechar(raiz, conexao):
     def fechar_janela():
         if conexao and conexao.is_connected():
             conexao.close()
         raiz.destroy()
 
-    botao_fechar = tk.Button(raiz, text="Sair", command=fechar_janela)
-    canvas.create_window(largura_janela - 100, altura_janela - 100, anchor="se", window=botao_fechar)
+    botao_fechar = tk.Button(raiz, text="Sair", command=fechar_janela, bg="#007BFF", fg="white", font=("Helvetica", 16, "bold"), padx=10, pady=5)
+    botao_fechar.place(relx=0.95, rely=0.95, anchor="se")
     return botao_fechar
 
 def principal():
     conexao, mensagem_conexao, cor_mensagem = criar_conexao()
-    anos = obter_anos(conexao)
-    paises = obter_paises(conexao)
-    raiz, largura_janela, altura_janela = criar_janela()
-    canvas = criar_canvas(raiz, largura_janela, altura_janela)
+    paises = obter_paises(conexao)  # Adicione esta linha
+    raiz = criar_janela()
+    canvas = criar_canvas(raiz)
 
-    menu_opcoes_anos, ano_selecionado = criar_menu_opcoes_anos(raiz, anos)
+    global menu_opcoes_anos, menu_opcoes_paises  # Definir como variáveis globais
+
     menu_opcoes_paises, pais_selecionado = criar_menu_opcoes_paises(raiz, paises)
-    botao_fechar = criar_botao_fechar(raiz, conexao, canvas, largura_janela, altura_janela)
+    menu_opcoes_paises.bind('<<ComboboxSelected>>', lambda event: atualizar_anos(event, conexao, valor_saida))  # Adicionar a ligação aqui
 
-    canvas.create_window(largura_janela / 2, 20, anchor="n", window=menu_opcoes_anos)
-    canvas.create_window(20, 20, anchor="nw", window=menu_opcoes_paises)
-    canvas.create_window(largura_janela - 100, altura_janela - 100, anchor="se", window=botao_fechar)
+    menu_opcoes_anos, ano_selecionado = criar_menu_opcoes_anos(raiz)
+    menu_opcoes_anos.bind('<<ComboboxSelected>>', lambda event: atualizar_taxa_natalidade_adolescente(event, conexao, valor_saida))  # Adicionar a ligação aqui
 
-    label_conexao = tk.Label(raiz, text=mensagem_conexao, fg=cor_mensagem, bg="white", font=("Helvetica", 10, "bold"))
-    canvas.create_window(20 + botao_fechar.winfo_reqwidth(), altura_janela - 10, anchor="sw", window=label_conexao)
+    campo_saida, valor_saida = criar_campo_saida(raiz)
+
+    botao_fechar = criar_botao_fechar(raiz, conexao)
+
+    # Posicionar os widgets um abaixo do outro
+    campo_saida.place(relx=0.5, rely=0.4, anchor="center")
+    menu_opcoes_paises.place(relx=0.5, rely=0.5, anchor="center")
+    menu_opcoes_anos.place(relx=0.5, rely=0.6, anchor="center")
+
+    botao_fechar.place(relx=0.95, rely=0.95, anchor="se")
+
+    label_conexao = tk.Label(raiz, text=mensagem_conexao, fg=cor_mensagem, bg="black", font=("Helvetica", 10, "bold"))
+    label_conexao.place(x=20, rely=0.98, anchor="sw")
 
     raiz.mainloop()
 
