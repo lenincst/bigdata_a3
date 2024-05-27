@@ -3,6 +3,7 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 import config
 
+# Função para criar uma conexão com o banco de dados
 def criar_conexao():
     try:
         conexao = config.create_connection()
@@ -14,22 +15,7 @@ def criar_conexao():
         cor_mensagem = "red"
     return conexao, mensagem_conexao, cor_mensagem
 
-def obter_anos(conexao):
-    anos = []
-    if conexao and conexao.is_connected():
-        cursor = conexao.cursor()
-        cursor.execute("SELECT DISTINCT ano FROM natalidade_pais")
-        anos = cursor.fetchall()
-    return anos
-
-def obter_anos_por_pais(conexao, pais):
-    anos = []
-    if conexao and conexao.is_connected():
-        cursor = conexao.cursor()
-        cursor.execute("SELECT DISTINCT ano FROM natalidade_pais WHERE pais = %s", (pais,))
-        anos = cursor.fetchall()
-    return anos
-
+# Função para obter todos os países disponíveis no banco de dados
 def obter_paises(conexao):
     paises = []
     if conexao and conexao.is_connected():
@@ -38,6 +24,25 @@ def obter_paises(conexao):
         paises = cursor.fetchall()
     return paises
 
+# Função para obter todos os anos disponíveis no banco de dados
+def obter_anos(conexao):
+    anos = []
+    if conexao and conexao.is_connected():
+        cursor = conexao.cursor()
+        cursor.execute("SELECT DISTINCT ano FROM natalidade_pais")
+        anos = cursor.fetchall()
+    return anos
+
+# Função para obter todos os anos disponíveis para um país específico
+def obter_anos_por_pais(conexao, pais):
+    anos = []
+    if conexao and conexao.is_connected():
+        cursor = conexao.cursor()
+        cursor.execute("SELECT DISTINCT ano FROM natalidade_pais WHERE pais = %s", (pais,))
+        anos = cursor.fetchall()
+    return anos
+
+# Função para obter a taxa de natalidade adolescente para um país e ano específicos
 def obter_taxa_natalidade_adolescente(conexao, pais, ano):
     taxa = None
     if conexao and conexao.is_connected():
@@ -48,19 +53,7 @@ def obter_taxa_natalidade_adolescente(conexao, pais, ano):
             taxa = resultado[0][0]  # Supondo que TaxaNatalidadeAdolescente seja a primeira coluna
     return taxa
 
-def atualizar_anos(event, conexao, valor_saida):
-    pais_selecionado = menu_opcoes_paises.get()
-    anos = obter_anos_por_pais(conexao, pais_selecionado)
-    menu_opcoes_anos['values'] = [ano[0] for ano in anos]
-    menu_opcoes_anos.set('')  # Limpar a seleção atual
-    valor_saida.set('')  # Limpar o campo de saída
-
-def atualizar_taxa_natalidade_adolescente(event, conexao, valor_saida):
-    pais_selecionado = menu_opcoes_paises.get()
-    ano_selecionado = menu_opcoes_anos.get()
-    taxa = obter_taxa_natalidade_adolescente(conexao, pais_selecionado, ano_selecionado)
-    valor_saida.set(taxa)
-
+# Função para criar a janela principal
 def criar_janela():
     raiz = tk.Tk()
     raiz.title("Análise Big Data A3")
@@ -80,6 +73,7 @@ def criar_janela():
 
     return raiz
 
+# Função para criar um canvas para a janela principal
 def criar_canvas(raiz):
     canvas = tk.Canvas(raiz, width=1000, height=600, bg="white")
     canvas.pack(fill="both", expand=True)
@@ -91,20 +85,7 @@ def criar_canvas(raiz):
 
     return canvas
 
-def criar_menu_opcoes_anos(raiz):
-    ano_selecionado = tk.StringVar(raiz)
-    ano_selecionado.set('')
-
-    menu_opcoes = ttk.Combobox(raiz, textvariable=ano_selecionado)
-    menu_opcoes.state(["readonly"])
-    return menu_opcoes, ano_selecionado
-
-def criar_campo_saida(raiz):
-    valor_saida = tk.StringVar(raiz)
-    campo_saida = tk.Label(raiz, textvariable=valor_saida, bg="white", fg="black", font=("Helvetica", 10, "bold"))
-    campo_saida.config(width=10)  # Definir uma largura fixa
-    return campo_saida, valor_saida
-
+# Função para criar um menu de opções para selecionar o país
 def criar_menu_opcoes_paises(raiz, paises):
     paises.sort(key=lambda x: x[0])
 
@@ -119,8 +100,38 @@ def criar_menu_opcoes_paises(raiz, paises):
 
     return menu_opcoes, pais_selecionado
 
+# Função para criar um menu de opções para selecionar o ano
+def criar_menu_opcoes_anos(raiz):
+    ano_selecionado = tk.StringVar(raiz)
+    ano_selecionado.set('')
 
+    menu_opcoes = ttk.Combobox(raiz, textvariable=ano_selecionado)
+    menu_opcoes.state(["readonly"])
+    return menu_opcoes, ano_selecionado
 
+# Função para criar um campo de saída para exibir a taxa de natalidade adolescente
+def criar_campo_saida(raiz):
+    valor_saida = tk.StringVar(raiz)
+    campo_saida = tk.Label(raiz, textvariable=valor_saida, bg="white", fg="black", font=("Helvetica", 10, "bold"))
+    campo_saida.config(width=10)  # Definir uma largura fixa
+    return campo_saida, valor_saida
+
+# Função para atualizar a lista de anos com base no país selecionado
+def atualizar_anos(event, conexao, valor_saida):
+    pais_selecionado = menu_opcoes_paises.get()
+    anos = obter_anos_por_pais(conexao, pais_selecionado)
+    menu_opcoes_anos['values'] = [ano[0] for ano in anos]
+    menu_opcoes_anos.set('')  # Limpar a seleção atual
+    valor_saida.set('')  # Limpar o campo de saída
+
+# Função para atualizar a taxa de natalidade adolescente com base no país e ano selecionados
+def atualizar_taxa_natalidade_adolescente(event, conexao, valor_saida):
+    pais_selecionado = menu_opcoes_paises.get()
+    ano_selecionado = menu_opcoes_anos.get()
+    taxa = obter_taxa_natalidade_adolescente(conexao, pais_selecionado, ano_selecionado)
+    valor_saida.set(taxa)
+
+# Função para criar um botão para fechar a janela
 def criar_botao_fechar(raiz, conexao):
     def fechar_janela():
         if conexao and conexao.is_connected():
@@ -131,25 +142,25 @@ def criar_botao_fechar(raiz, conexao):
     botao_fechar.place(relx=0.95, rely=0.95, anchor="se")
     return botao_fechar
 
+# Função principal para executar o programa
 def principal():
     conexao, mensagem_conexao, cor_mensagem = criar_conexao()
-    paises = obter_paises(conexao)  # Adicione esta linha
+    paises = obter_paises(conexao)
     raiz = criar_janela()
     canvas = criar_canvas(raiz)
 
-    global menu_opcoes_anos, menu_opcoes_paises  # Definir como variáveis globais
+    global menu_opcoes_anos, menu_opcoes_paises
 
     menu_opcoes_paises, pais_selecionado = criar_menu_opcoes_paises(raiz, paises)
-    menu_opcoes_paises.bind('<<ComboboxSelected>>', lambda event: atualizar_anos(event, conexao, valor_saida))  # Adicionar a ligação aqui
+    menu_opcoes_paises.bind('<<ComboboxSelected>>', lambda event: atualizar_anos(event, conexao, valor_saida))
 
     menu_opcoes_anos, ano_selecionado = criar_menu_opcoes_anos(raiz)
-    menu_opcoes_anos.bind('<<ComboboxSelected>>', lambda event: atualizar_taxa_natalidade_adolescente(event, conexao, valor_saida))  # Adicionar a ligação aqui
+    menu_opcoes_anos.bind('<<ComboboxSelected>>', lambda event: atualizar_taxa_natalidade_adolescente(event, conexao, valor_saida))
 
     campo_saida, valor_saida = criar_campo_saida(raiz)
 
     botao_fechar = criar_botao_fechar(raiz, conexao)
 
-    # Posicionar os widgets um abaixo do outro
     campo_saida.place(relx=0.5, rely=0.4, anchor="center")
     menu_opcoes_paises.place(relx=0.5, rely=0.5, anchor="center")
     menu_opcoes_anos.place(relx=0.5, rely=0.6, anchor="center")
